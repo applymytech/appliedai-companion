@@ -1,111 +1,88 @@
-# /scripts/image_generation.py (Verified & Refactored)
-
 # =============================================================================
-# SECTION 1: DEPENDENCIES
+# SECTION 1: DEPENDENCIES & SETUP
 # =============================================================================
 import os
-import sys
 import json
-import requests
-import time
+import base64
 from logger import setup_logger
+# Import the new, centralized API call wrapper
+from api_clients import call_deepai_model
 
 logger = setup_logger('image_generation')
 
 # =============================================================================
-# SECTION 2: CONFIGURATION
+# SECTION 2: CORE LOGIC FUNCTIONS
 # =============================================================================
-# This dictionary now reflects the curated and renamed list of features.
-DEEPAI_ENDPOINTS = {
-    'text2img': 'https://api.deepai.org/api/text2image',
-    'ghibli-style': 'https://api.deepai.org/api/ghibli-style', # "Animation Style"
-    'background-remover': 'https://api.deepai.org/api/background-remover',
-    'image-editor': 'https://api.deepai.org/api/image-editor',         # "AI Photo Editor"
-    'toonify': 'https://api.deepai.org/api/toonify',
-    'torch-srgan': 'https://api.deepai.org/api/torch-srgan',         # "Super Resolution"
-    'waifu2x': 'https://api.deepai.org/api/waifu2x',                 # "Premium Upscaler"
-}
+# These functions now only prepare data and call the wrapper from api_clients.py.
+# They do not handle API keys or make direct web requests.
+
+def text_to_image(prompt):
+    """Generates an image from a text prompt."""
+    data = {'text': prompt}
+    return call_deepai_model('text2img', data=data)
+
+def toonify_image(image_path):
+    """Applies a cartoon effect to an image."""
+    with open(image_path, 'rb') as image_file:
+        files = {'image': image_file}
+        return call_deepai_model('toonify', files=files)
+
+def upscale_image(image_path):
+    """Upscales an image using the torch-srgan model."""
+    with open(image_path, 'rb') as image_file:
+        files = {'image': image_file}
+        return call_deepai_model('torch-srgan', files=files)
+
+# Add other DeepAI tool functions here following the same pattern...
 
 # =============================================================================
-# SECTION 3: CORE GENERATION LOGIC
+# SECTION 3: ADAPTER FUNCTION FOR SCRIPT ROUTER
 # =============================================================================
-def generate_image(type, params, output_dir):
+def generate_image_adapter(payload, output_dir):
     """
-    Calls the specified DeepAI endpoint to generate or modify an image.
+    Adapter function that routes to the correct image generation tool
+    based on the payload from the frontend.
     """
-    if type not in DEEPAI_ENDPOINTS:
-        raise ValueError(f"Invalid DeepAI type: {type}")
-        
-    api_key = os.environ.get('DEEP_AI_KEY')
-    if not api_key:
-        raise ValueError("DEEP_AI_KEY not found. Please set it in the .env file.")
+    tool_type = payload.get('type')
+    params = payload.get('params', {})
+    
+    if not tool_type:
+        return {"error": "No image generation tool type specified.", "coins_used": 0}
 
-    endpoint = DEEPAI_ENDPOINTS[type]
+    logger.info(f"Routing to image generation tool: {tool_type}")
+
     try:
-        logger.info(f"Calling DeepAI '{type}' with params: {params}")
+        if tool_type == 'text2img':
+            prompt = params.get('text')
+            if not prompt: return {"error": "Prompt is required for text-to-image.", "coins_used": 0}
+            result_data, coins_used = text_to_image(prompt)
         
-        # Prepare headers and data for the API request
-        headers = {'api-key': api_key}
-        files = {}
-        data = {}
-
-        # Some DeepAI models expect 'image' as a file, others as a URL in 'data'
-        if 'image' in params and os.path.exists(params['image']):
-            files['image'] = open(params['image'], 'rb')
+        elif tool_type == 'toonify':
+            image_path = params.get('image')
+            if not image_path: return {"error": "Image path is required for toonify.", "coins_used": 0}
+            result_data, coins_used = toonify_image(image_path)
+            
+        elif tool_type == 'torch-srgan':
+            image_path = params.get('image')
+            if not image_path: return {"error": "Image path is required for upscaling.", "coins_used": 0}
+            result_data, coins_used = upscale_image(image_path)
+            
+        # Add other tool routes here...
         else:
-            data = params
+            return {"error": f"Unknown image generation tool: '{tool_type}'", "coins_used": 0}
 
-        response = requests.post(endpoint, data=data, files=files, headers=headers)
-        response.raise_for_status()
-        response_data = response.json()
-
-        if 'output_url' not in response_data:
-            raise ValueError("No 'output_url' in API response.")
-
-        # Download the resulting image
-        image_url = response_data['output_url']
-        with requests.get(image_url, stream=True) as r:
-            r.raise_for_status()
-            image_data = r.content
-
-        # Create a safe filename and save the image
-        prompt_text = params.get('text', type)[:30]
-        safe_name = "".join(c for c in prompt_text if c.isalnum() or c in " ._").rstrip()
-        timestamp = int(time.time())
-        filename = f"{type}_{safe_name}_{timestamp}.png"
-        output_path = os.path.join(output_dir, filename)
-
-        with open(output_path, "wb") as f:
-            f.write(image_data)
-
-        logger.info(f"Image saved to {output_path}")
-        # Assuming DeepAI token cost is handled externally for now
-        return output_path, 0 
+        # Process the successful response
+        if 'output_url' in result_data:
+            # For DeepAI, we need to download the generated image
+            import requests
+            image_response = requests.get(result_data['output_url'])
+            image_response.raise_for_status()
+            image_base64 = base64.b64encode(image_response.content).decode('utf-8')
+            return {"image_base64": image_base64, "coins_used": coins_used}
+        else:
+            logger.error(f"DeepAI response for '{tool_type}' did not contain 'output_url'. Response: {result_data}")
+            return {"error": "Failed to retrieve image from API response.", "coins_used": coins_used}
 
     except Exception as e:
-        logger.error(f"Error in {type}: {e}", exc_info=True)
-        raise
-    finally:
-        if 'image' in files and files['image']:
-            files['image'].close()
-
-# =============================================================================
-# SECTION 4: MAIN EXECUTION BLOCK
-# =============================================================================
-if __name__ == "__main__":
-    try:
-        output_dir_arg = sys.argv[1]
-        type_arg = sys.argv[2]
-        params_json = " ".join(sys.argv[3:])
-        params_arg = json.loads(params_json)
-        
-        image_path, tokens_used = generate_image(type_arg, params_arg, output_dir_arg)
-        
-        print(json.dumps({
-            "success": True, 
-            "image_path": image_path, 
-            "tokens_used": tokens_used
-        }))
-    except Exception as e:
-        print(json.dumps({"error": str(e), "tokens_used": 0}), file=sys.stderr)
-        sys.exit(1)
+        logger.error(f"An error occurred in generate_image_adapter for tool '{tool_type}': {e}", exc_info=True)
+        return {"error": str(e), "coins_used": 0}

@@ -1,93 +1,76 @@
-# /scripts/json_conversion.py (Implemented JSON to Markdown)
-
 # =============================================================================
-# SECTION 1: DEPENDENCIES
+# SECTION 1: DEPENDENCIES & SETUP
 # =============================================================================
-import sys
 import os
 import json
+import pandas as pd
 from logger import setup_logger
+from ai_utils import get_ai_quality_check
 
 logger = setup_logger('json_conversion')
 
 # =============================================================================
 # SECTION 2: CORE CONVERSION LOGIC
 # =============================================================================
-
-def json_to_markdown(data, indent=0):
-    """Recursively converts a JSON object/array to a Markdown string."""
-    markdown_str = ""
-    indent_str = "  " * indent
-
-    if isinstance(data, dict):
-        for key, value in data.items():
-            markdown_str += f"{indent_str}- **{key}**:\n"
-            if isinstance(value, (dict, list)):
-                markdown_str += json_to_markdown(value, indent + 1)
-            else:
-                markdown_str += f"{indent_str}  {value}\n"
-    elif isinstance(data, list):
-        for item in data:
-            markdown_str += f"{indent_str}- "
-            if isinstance(item, (dict, list)):
-                markdown_str += "\n" + json_to_markdown(item, indent + 1)
-            else:
-                markdown_str += f"{item}\n"
+def json_to_markdown(data):
+    """Converts a JSON object (dict or list of dicts) to a markdown table."""
+    if isinstance(data, list):
+        df = pd.DataFrame(data)
+        return df.to_markdown(index=False)
+    elif isinstance(data, dict):
+        df = pd.DataFrame([data])
+        return df.to_markdown(index=False)
     else:
-        markdown_str += f"{indent_str}{data}\n"
+        raise TypeError("JSON data must be a list of objects or a single object.")
+
+# =============================================================================
+# SECTION 3: ADAPTER FUNCTION FOR SCRIPT ROUTER
+# =============================================================================
+def convert_json_adapter(payload, output_dir):
+    """Adapter to handle JSON conversion requests."""
+    files_to_convert = payload.get('files', [])
+    output_format = payload.get('format', 'md')
     
-    return markdown_str
+    if not files_to_convert:
+        return {"error": "No files specified for conversion.", "coins_used": 0}
 
-def convert_json(input_paths, output_format, output_dir):
-    """
-    Converts JSON files to specified formats, with a focus on Markdown.
-    """
-    if output_format not in ['md', 'txt']: # Extend as needed for other formats
-        logger.error(f"Unsupported output format for JSON conversion: {output_format}")
-        raise ValueError(f"Unsupported output format for JSON conversion: {output_format}")
+    total_coins_used = 0
+    success_count = 0
+    fail_count = 0
 
-    converted_files_count = 0
-    for input_path in input_paths:
-        base_name = os.path.splitext(os.path.basename(input_path))[0]
-        output_path = os.path.join(output_dir, f"{base_name}.{output_format}")
-        
+    for file_path in files_to_convert:
         try:
-            with open(input_path, 'r', encoding='utf-8') as f:
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            output_path = os.path.join(output_dir, f"{base_name}.{output_format}")
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
                 json_data = json.load(f)
-            
+
+            converted_content = ""
             if output_format == 'md':
-                markdown_output = f"# Content from {os.path.basename(input_path)}\n\n"
-                markdown_output += json_to_markdown(json_data)
+                converted_content = json_to_markdown(json_data)
                 with open(output_path, 'w', encoding='utf-8') as f:
-                    f.write(markdown_output)
-            elif output_format == 'txt':
-                # For plain text, just dump the JSON as a string
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    f.write(json.dumps(json_data, indent=2))
-            
-            logger.info(f"Converted {input_path} to {output_path}")
-            converted_files_count += 1
+                    f.write(converted_content)
+            else:
+                logger.warning(f"Unsupported JSON output format: {output_format}")
+                fail_count += 1
+                continue
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Error decoding JSON from {input_path}: {e}")
-            raise ValueError(f"Invalid JSON file: {os.path.basename(input_path)}")
+            logger.info(f"Successfully converted {file_path} to {output_path}")
+            success_count += 1
+
+            # --- AI Quality Check ---
+            logger.info(f"Performing AI quality check on conversion of '{file_path}'...")
+            quality_result, cost = get_ai_quality_check(converted_content)
+            total_coins_used += cost
+            logger.info(f"AI Quality Check for '{base_name}.{output_format}' result: {quality_result}. Cost: {cost:.4f} AI Coins.")
+
         except Exception as e:
-            logger.error(f"Error during JSON conversion for {input_path}: {e}")
-            raise
+            logger.error(f"Failed to convert JSON file {file_path}: {e}", exc_info=True)
+            fail_count += 1
 
-    return f"Successfully converted {converted_files_count} file(s)."
-
-# =============================================================================
-# SECTION 3: MAIN EXECUTION BLOCK
-# =============================================================================
-if __name__ == '__main__':
-    try:
-        output_dir = sys.argv[1]
-        output_format = sys.argv[2]
-        input_paths = sys.argv[3:]
-        convert_json(input_paths, output_format, output_dir)
-        print("JSON conversion completed successfully.")
-    except Exception as e:
-        logger.error(f"An error occurred in json_conversion.py: {e}", exc_info=True)
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+    message = f"Successfully converted {success_count} JSON file(s)."
+    if fail_count > 0:
+        message += f" Failed to convert {fail_count}. See logs for details."
+        
+    return {"message": message, "coins_used": total_coins_used}

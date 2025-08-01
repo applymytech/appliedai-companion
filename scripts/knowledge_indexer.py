@@ -5,7 +5,6 @@ from vector_store import create_embeddings, build_and_save_index
 KNOWLEDGE_BASE_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'knowledge_base')
 
 def chunk_text(text, chunk_size=500, overlap=50):
-    """Splits text into overlapping chunks."""
     # A simple sentence-based chunking strategy
     sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text)
     chunks = []
@@ -21,9 +20,7 @@ def chunk_text(text, chunk_size=500, overlap=50):
     return chunks
 
 def reindex_knowledge_base(api_key, payload, output_dir):
-    """Reads all knowledge files, chunks them, and builds a vector index."""
     all_chunks = []
-    
     # Iterate through all users' knowledge bases
     for user_id in os.listdir(KNOWLEDGE_BASE_DIR):
         user_path = os.path.join(KNOWLEDGE_BASE_DIR, user_id)
