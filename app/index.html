@@ -1,0 +1,313 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AppliedAI Companion</title>
+    <link rel="stylesheet" href="../styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h1>Applying AI With Gemma</h1>
+            <nav class="nav-items">
+                <a class="nav-item" data-view="chatbot" data-title="Chatbot Helper"><img src="../assets/google_ai_logo.svg" alt="Powered by Google AI" class="google-ai-logo"><br>Powered Chatbot</a>
+                <a class="nav-item" data-view="dashboard" data-title="Dashboard">Dashboard</a>
+                <hr class="nav-divider">
+
+                <div class="nav-category">
+                    <a class="nav-item nav-toggle">Toolbox</a>
+                    <div class="sub-nav">
+                        <a class="nav-item sub-item" data-view="imageGeneration" data-title="AI Image Studio">AI Image Studio</a>
+                        <a class="nav-item sub-item" data-view="pdfConversions" data-title="PDF Conversions">PDF Conversions</a>
+                        <a class="nav-item sub-item" data-view="jsonConversions" data-title="JSON Conversions">JSON Conversions</a>
+                        <a class="nav-item sub-item" data-view="markdownConversions" data-title="Markdown Conversions">Markdown Conversions</a>
+                        <a class="nav-item sub-item" data-view="webScrapers" data-title="Web Scrapers">Web Scrapers</a>
+                        <a class="nav-item sub-item" data-view="fileManagement" data-title="File Management">File Management</a>
+                    </div>
+                </div>
+                
+                <hr class="nav-divider">
+
+                <a class="nav-item" data-view="help" data-title="Contact Support">Contact Support</a>
+            </nav>
+            <p class="footer">© 2025 AppliedAI</p>
+        </aside>
+        
+        <main>
+            <header>
+                <h2 id="pageTitle">Dashboard</h2>
+            </header>
+            
+            <div id="loadingIndicator" class="loading-bar hidden"></div>
+            <div id="statusMessage" class="hidden"></div>
+
+            <section id="dashboardView" class="view-section dashboard-container active">
+                <div class="tool-section">
+                    <h3>Output Settings</h3>
+                    <p>All generated files will be saved to this folder.</p>
+                    <button id="openOutputFolderBtn" class="btn">Open Output Folder</button>
+                    <button id="changeOutputBtn" class="btn">Change Output Folder</button>
+                    <button id="resetOutputBtn" class="btn">Reset to Default</button>
+                    <p>Current Path: <span id="outputPath">Loading...</span></p>
+                    
+                    <div id="shredOptions" style="margin-top: 10px;">
+                        <label for="shredOnExit">
+                            <input type="checkbox" id="shredOnExit" checked>
+                            Shred conversions output folder on exit? 
+                        </label>
+                        <p style="color: red; font-weight: bold;">Warning: Enabling this will permanently deleteall files in the output folder when you close the app.<br> This cannot be undone—use with caution!</p>
+                        <button id="shredNowBtn" class="btn btn-secondary">Shred Output Folder Now</button>
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Chatbot Knowledge Base</h3>
+                    <p>Upload Markdown (.md) files for the chatbot to use as a knowledge source.</p>
+                    <div id="dashboard-knowledge-files-list" class="knowledge-file-list-container">
+                        </div>
+                    <div class="controls">
+                        <button id="addToKnowledgeBtn" class="btn">Add Knowledge File(s)</button>
+                        <button id="clearKnowledgeBtn" class="btn btn-secondary">Clear All Knowledge</button>
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <h3>Account Tokens</h3>
+                    <p>Tokens are used by AI-powered features and are refreshed upon login.</p>
+                    <p><span id="tokenCount">0</span> tokens</p>
+                </div>
+            </section>
+
+            <section id="pdfConversionsView" class="view-section tool-container">
+                <h3>PDF Conversion</h3>
+                <p>Convert one or more PDF files to various formats. AI-powered conversions like Markdown or PowerPoint may use tokens.</p>
+                <select id="outputFormatSelect">
+                    <option value="txt">Text (.txt)</option>
+                    <option value="docx">Word (.docx)</option>
+                    <option value="csv">CSV (.csv)</option>
+                    <option value="html">HTML (.html)</option>
+                    <option value="xlsx">Excel (.xlsx)</option>
+                    <option value="png">Images (.png)</option>
+                    <option value="md">Markdown (.md)</option>
+                    <option value="pptx">PowerPoint (.pptx)</option>
+                </select>
+                <button id="selectPdfBtn" class="btn">Select PDF(s)</button>
+                <p id="selectedPdfPaths">Selected files: None</p>
+                <button id="convertPdfBtn" class="btn btn-primary" disabled>Convert PDF(s)</button>
+            </section>
+
+            <section id="aiImageStudioView" class="view-section tool-container hidden">
+                <div class="studio-tabs">
+                    <button class="tab-link active" data-tab="ai-generation">AI Generation</button>
+                    <button class="tab-link" data-tab="image-tools">Image Conversion & Tools</button>
+                </div>
+
+                <div id="ai-generation" class="studio-tab-content active">
+                    <div class="image-studio-layout">
+                        <div class="image-studio-controls">
+                            <h4>Tools</h4>
+                            <div class="tool-selection-grid">
+                                <div class="tool-card" data-tool="text2img">Text to Image</div>
+                                <div class="tool-card" data-tool="ghibli-style">Animation Style</div>
+                                <div class="tool-card" data-tool="toonify">Toonify</div>
+                                <div class="tool-card premium" data-tool="image-editor">
+                                    AI Photo Editor<span>Premium</span>
+                                </div>
+                                <div class="tool-card premium" data-tool="torch-srgan">
+                                    Super Resolution<span>Premium</span>
+                                </div>
+                                <div class="tool-card premium" data-tool="waifu2x">
+                                    Premium Upscaler<span>Premium</span>
+                                </div>
+                                <div class="tool-card" data-tool="background-remover">Background Remover</div>
+                            </div>
+
+                            <div id="dynamic-controls-area" class="hidden">
+                                <h5 id="tool-title"></h5>
+                                <p id="tool-instructions"></p>
+                                <div id="text-input-container" class="hidden">
+                                    <textarea id="imagePromptInput" placeholder="Enter your prompt here..."></textarea>
+                                </div>
+                                <div id="image-input-container" class="hidden">
+                                    <button id="selectAiImageBtn" class="btn">Select Input Image</button>
+                                    <p id="selectedAiImagePath">No file selected.</p>
+                                </div>
+                                <button id="runAiToolBtn" class="btn btn-primary">Generate</button>
+                            </div>
+                        </div>
+
+                        <div class="image-studio-output">
+                            <h4>Output</h4>
+                            <div id="imageResultContainer" class="image-output-box">
+                                <img id="generatedImage" alt="Generated Image" class="hidden">
+                                <span>Your generated image will appear here.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="image-tools" class="studio-tab-content">
+                    <h4>Image Conversion & Resizing</h4>
+                    <p>Convert multiple images between formats and optionally resize them.</p>
+                    <select id="outputFormatImageSelect">
+                        <option value="png">PNG</option>
+                        <option value="jpeg">JPEG</option>
+                        <option value="gif">GIF</option>
+                        <option value="bmp">BMP</option>
+                        <option value="tiff">TIFF</option>
+                        <option value="webp">WebP</option>
+                        <option value="ico">ICO</option>
+                        <option value="pdf">Combine to PDF</option>
+                    </select>
+                    
+                    <div>
+                        <label>Width: <input type="number" id="resizeWidth" placeholder="auto"></label>
+                        <label>Height: <input type="number" id="resizeHeight" placeholder="auto"></label>
+                        <label><input type="checkbox" id="preserveAspect" checked> Preserve Aspect Ratio</label>
+                    </div>
+
+                    <button id="selectImageBtn" class="btn">Select Image(s)</button>
+                    <p id="selectedImagePaths">Selected files: None</p>
+                    <button id="convertImageBtn" class="btn btn-primary" disabled>Convert Image(s)</button>
+                </div>
+            </section>
+
+            <section id="jsonConversionsView" class="view-section tool-container">
+                <h3>JSON Conversion <button class="output-shortcut" title="Open Output Folder">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 5H17V15H3V5Z" stroke="black" stroke-width="2"/>
+                      <path d="M8 3H3V5H8V3Z" stroke="black" stroke-width="2"/>
+                    </svg>
+                </button></h3>
+                <select id="jsonOutputFormatSelect">
+                    <option value="md">Markdown (.md)</option>
+                    <option value="docx">Word (.docx)</option>
+                </select>
+                <button id="selectJsonBtn" class="btn">Select JSON File(s)</button>
+                <p id="selectedJsonPaths">Selected files: None</p>
+                <button id="convertJsonBtn" class="btn btn-primary" disabled>Convert JSON</button>
+            </section>
+
+            <section id="markdownConversionsView" class="view-section tool-container">
+                <h3>Markdown Conversion <button class="output-shortcut" title="Open Output Folder">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 5H17V15H3V5Z" stroke="black" stroke-width="2"/>
+                      <path d="M8 3H3V5H8V3Z" stroke="black" stroke-width="2"/>
+                    </svg>
+                </button></h3>
+                <select id="markdownOutputFormatSelect">
+                    <option value="docx">Word (.docx)</option>
+                    <option value="pdf">PDF (.pdf)</option>
+                    <option value="html">HTML (.html)</option>
+                </select>
+                <button id="selectMarkdownBtn" class="btn">Select Markdown File(s)</button>
+                <p id="selectedMarkdownPaths">Selected files: None</p>
+                <button id="convertMarkdownBtn" class="btn btn-primary" disabled>Convert Markdown</button>
+            </section>
+
+            <section id="fileManagementView" class="view-section tool-container">
+                <div class="tool-section">
+                    <h3>File Merger</h3>
+                    <p>Select multiple files to merge them into a single file. For with contents, AI generates titles and summaries.</p>
+                    <label><input type="radio" name="mergeMode" value="straight" checked> Straight Merge</label>
+                    <label><input type="radio" name="mergeMode" value="with_contents"> Merge with Contents and Cover Pages</label>
+                    <button id="selectMergeFilesBtn" class="btn">Select Files to Merge</button>
+                    <p id="selectedMergePaths">Selected files: None</p>
+                    <ul id="mergeFileList" class="hidden"></ul>
+                    <button id="mergeFilesBtn" class="btn btn-primary" disabled>Merge Selected Files</button>
+                </div>
+
+                <div class="tool-section">
+                    <h3>File Shredder</h3>
+                    <p>Securely shred selected files or a folder. This action is irreversible.</p>
+                    <button id="selectShredFilesBtn" class="btn">Select Files to Shred</button>
+                    <p id="selectedShredPaths">Selected files: None</p>
+                    <ul id="shredFileList" class="hidden"></ul>
+                    <button id="shredFilesBtn" class="btn btn-secondary" disabled>Shred Selected Files</button>
+                    <button id="shredFolderBtn" class="btn btn-secondary">Select & Shred a Folder</button>
+                </div>
+            </section>
+
+            <section id="webScrapersView" class="view-section tool-container">
+                <h3>Web Scrapers</h3>
+                <div>
+                    <h4>Single Page to Markdown</h4>
+                    <p>Enter a URL to convert its text content to a Markdown file.</p>
+                    <input type="text" id="singlePageUrlInput" placeholder="Enter URL">
+                    <button id="scrapeSinglePageBtn" class="btn btn-primary">Scrape Page</button>
+                </div>
+                
+                <div>
+                    <h4>Sitemap to Markdown</h4>
+                    <p>Enter a `sitemap.xml` URL to scrape all pages into individual Markdown files.</p>
+                    <input type="text" id="sitemapUrlInput" placeholder="Enter Sitemap URL">
+                    <button id="scrapeSitemapBtn" class="btn btn-primary">Scrape Sitemap</button>
+                </div>
+                
+                <div>
+                    <h4>File Downloader from Page</h4>
+                    <p>Enter a URL to find and download all linked files of a specific type.</p>
+                    <input type="text" id="fileDownloaderUrlInput" placeholder="Enter URL">
+                    <select id="fileTypeSelect">
+                        <option value="pdf">PDF</option>
+                        <option value="docx">DOCX</option>
+                        <option value="jpg">JPG</option>
+                        <option value="png">PNG</option>
+                    </select>
+                    <button id="downloadFilesBtn" class="btn btn-primary">Download Files</button>
+                </div>
+                 
+                <div>
+                    <h4>Sitemap File Downloader</h4>
+                    <p>Enter a sitemap URL to find and download all linked files of a specific type.</p>
+                    <input type="text" id="sitemapFileDownloaderUrlInput" placeholder="Enter Sitemap URL">
+                    <select id="sitemapFileTypeSelect">
+                        <option value="pdf">PDF</option>
+                        <option value="docx">DOCX</option>
+                        <option value="jpg">JPG</option>
+                        <option value="png">PNG</option>
+                    </select>
+                    <button id="downloadFromSitemapBtn" class="btn btn-primary">Download from Sitemap</button>
+                </div>
+            </section>
+
+            <section id="chatbotView" class="view-section chat-container">
+                <div class="chatbot-main-area">
+                    <h3><img src="../assets/google_ai_logo.svg" alt="Powered by Google AI" class="google-ai-logo"> Meet Gemma! Your built-in AI helper.</h3>
+                    <button id="clearChatHistoryBtn" class="btn">Clear History</button>
+                    <div id="chatMessages"></div>
+                    <div id="ephemeral-files-display" class="hidden">
+                        <strong>Attached:</strong> <span id="ephemeral-files-list"></span>
+                        <button id="clearEphemeralFilesBtn">&times;</button>
+                    </div>
+                    <div class="chat-input-area">
+                        <button id="attachFileBtn" class="btn" title="Attach file to this message">📎</button>
+                        <textarea id="chatInput" placeholder="Type your message..."></textarea>
+                        <button id="sendMessageBtn" class="btn btn-primary">Send</button>
+                    </div>
+                </div>
+                <aside class="chatbot-sidebar">
+                    <h4>Focus Canvas</h4>
+                    <p>Files here are the primary focus for the entire session.</p>
+                    <div id="canvas-files-list">
+                        </div>
+                    <div class="controls">
+                        <button id="addToCanvasBtn" class="btn">Add File(s) to Canvas</button>
+                        <button id="clearCanvasBtn" class="btn btn-secondary">Clear Canvas</button>
+                    </div>
+                </aside>
+            </section>
+
+            <section id="helpView" class="view-section tool-container">
+                <h3>Contact Support</h3>
+                <p>If you need help or have questions, please reach out.</p>
+                <button id="supportEmailBtn" class="btn">Email Support</button>
+                <button id="privacyEmailBtn" class="btn">Email for Privacy Information</button>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="companion_renderer.js"></script>
+</body>
+</html>

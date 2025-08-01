@@ -1,0 +1,22 @@
+# Secrets and env
+.env
+
+# Node modules
+node_modules/
+
+# Logs and temp
+logs/
+*.log
+temp/
+*.tmp
+
+# Builds and dist
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Electron-specific
+.electron-cache/
