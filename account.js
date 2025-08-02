@@ -97,7 +97,6 @@ async function initializeAccountPage(uid) {
             userTokensSpan.textContent = data.coins;
 
             // FIX: Store the fetched data in sessionStorage for the main app.
-            // This prepares the necessary data for the next page (companion_renderer.js).
             sessionStorage.setItem('userUID', uid);
             sessionStorage.setItem('userName', data.name || "User");
             sessionStorage.setItem('userEmail', data.email);

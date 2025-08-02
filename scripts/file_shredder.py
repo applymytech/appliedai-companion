@@ -48,7 +48,6 @@ def shred_folder_contents(folder_path):
 # SECTION 3: ADAPTER FUNCTIONS FOR SCRIPT ROUTER
 # =============================================================================
 def shred_files_adapter(payload, output_dir):
-    """Adapter to shred a list of specified files."""
     files_to_shred = payload.get('files', [])
     if not files_to_shred:
         return {"error": "No files specified for shredding.", "coins_used": 0}
@@ -59,7 +58,6 @@ def shred_files_adapter(payload, output_dir):
     return {"message": f"Shredding process completed for {len(files_to_shred)} file(s).", "coins_used": 0}
 
 def shred_folder_adapter(payload, output_dir):
-    """Adapter to shred the contents of a specified folder."""
     folder_to_shred = payload.get('folder_path')
     if not folder_to_shred:
         return {"error": "No folder path specified for shredding.", "coins_used": 0}

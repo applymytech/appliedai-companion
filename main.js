@@ -57,7 +57,7 @@ function createWindow() {
         width: 1300,
         height: 900,
         webPreferences: {
-            preload: path.join(__dirname, 'app', 'renderer.js'),
+            preload: path.join(__dirname, 'app', 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
         }
@@ -69,12 +69,13 @@ app.whenReady().then(async () => {
     await initializeStore();
     
     const expressApp = express();
-    expressApp.use(express.static(__dirname)); // For login.html, account.html etc.
-    expressApp.use('/app', express.static(path.join(__dirname, 'app'))); // For index.html & its assets
-    expressApp.use(express.static(path.join(__dirname, 'src'))); // For styles.css
+    expressApp.use(express.static(__dirname));
+    expressApp.use('/app', express.static(path.join(__dirname, 'app')));
+    expressApp.use(express.static(path.join(__dirname, 'src')));
     expressApp.listen(3000, () => log.info('[Main Process] Local server started on http://localhost:3000'));
     
-    setupIpcHandlers(); // Set up handlers ONCE before creating the window
+    setupIpcHandlers(); 
+    log.info('\n--- NEW APPLICATION SESSION STARTED ---\n'); 
     createWindow();
     
     app.on('activate', () => {
@@ -112,7 +113,7 @@ app.on('before-quit', () => {
         log.error(`[Main Process] Health summary generation failed: ${summaryResult.stderr}`);
     } else {
         const summaryContent = summaryResult.stdout;
-        const summaryFileName = `health_summary_${Date.now()}.txt`;
+        const summaryFileName = `health_summary_${Date.now()}.md`;
         const summaryFilePath = path.join(logDirectory, summaryFileName);
         try {
             fs.writeFileSync(summaryFilePath, summaryContent);
@@ -178,27 +179,62 @@ function setupIpcHandlers() {
         }
     });
 
-    // --- Script Executor ---
-    ipcMain.on('run-script', (event, { functionName, payload = {} }) => {
-        const outputPath = store.get('outputPath');
-        log.info(`[Main Process] Executing script: '${functionName}'`);
-        const scriptPath = path.join(__dirname, 'scripts', 'script_router.py');
-        const env = { ...process.env, PYTHONIOENCODING: 'utf-8' };
-        const scriptArgs = [scriptPath, functionName, "UNUSED_API_KEY", JSON.stringify(payload), outputPath];
-        const pyProcess = spawn('python', scriptArgs, { env });
-        
-        pyProcess.stdout.on('data', (data) => {
-            event.sender.send('script-reply', { success: true, data: data.toString(), source: functionName });
-        });
-        pyProcess.stderr.on('data', (data) => {
-            log.error(`[Python STDERR - ${functionName}] ${data.toString().trim()}`);
-            event.sender.send('script-reply', { success: false, error: data.toString(), source: functionName });
-        });
-        
+     // --- Script Executor ---
+ipcMain.handle('run-script', async (event, { functionName, payload = {} }) => { // Changed to handle and async
+    const outputPath = store.get('outputPath');
+    log.info(`[Main Process] Executing script: '${functionName}'`);
+    const scriptPath = path.join(__dirname, 'scripts', 'script_router.py');
+    const env = { ...process.env, PYTHONIOENCODING: 'utf-8' };
+    // Ensure payload is a string
+    const payloadString = JSON.stringify(payload);
+    const scriptArgs = [scriptPath, functionName, "UNUSED_API_KEY", payloadString, outputPath];
+    const pyProcess = spawn('python', scriptArgs, { env });
+
+    let scriptOutput = '';
+    let scriptError = '';
+
+    // Capture stdout data (should be the final JSON result)
+    pyProcess.stdout.on('data', (data) => {
+        scriptOutput += data.toString();
+    });
+
+    // Capture stderr data (should be Python log messages or actual errors)
+    pyProcess.stderr.on('data', (data) => {
+        const stderrLine = data.toString().trim();
+        if (stderrLine) {
+            if (stderrLine.startsWith('2025-08-02') && (stderrLine.includes('INFO') || stderrLine.includes('WARNING') || stderrLine.includes('ERROR'))) { 
+                 log.info(`[Python LOG - ${functionName}] ${stderrLine}`);
+            } else {
+                 log.error(`[Python STDERR - ${functionName}] ${stderrLine}`);
+                 scriptError += stderrLine + '\n'; 
+            }
+        }
+    });
+
+    return new Promise((resolve, reject) => {
         pyProcess.on('close', (code) => {
             if (code !== 0) {
                 log.warn(`[Main Process] Script '${functionName}' finished with non-zero exit code: ${code}`);
+                // If there's an accumulated scriptError, send it. Otherwise, send generic error.
+                resolve({ success: false, error: scriptError || `Script exited with code ${code}`, source: functionName }); // Resolve with failure
+            } else {
+                // Try to parse the final stdout as JSON. If it fails, something is wrong with Python output.
+                try {
+                    const finalData = scriptOutput.trim();
+                    // This JSON.parse() is a validation step. The 'data' passed to renderer is the string.
+                    JSON.parse(finalData); 
+                    resolve({ success: true, data: finalData, source: functionName }); // Resolve with success
+                } catch (e) {
+                    log.error(`[Main Process] Script '${functionName}' returned non-JSON output on stdout or was empty: "${scriptOutput.trim()}". Error: ${e.message}`);
+                    resolve({ success: false, error: `Invalid response format from script: ${e.message}. Check logs.`, source: functionName }); // Resolve with failure
+                }
             }
         });
+
+        pyProcess.on('error', (err) => { // Handle process spawn errors
+            log.error(`[Main Process] Failed to start script process '${functionName}': ${err.message}`);
+            resolve({ success: false, error: `Failed to start script: ${err.message}`, source: functionName });
+        });
     });
+});
 }

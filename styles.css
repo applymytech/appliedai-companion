@@ -295,6 +295,47 @@ textarea {
     transition: width 0.3s ease-in-out;
 }
 
+/* Add to SECTION 5: UTILITY & FEEDBACK STYLES or a new Chatbot specific section */
+.thinking-dots {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    width: 6em; /* Adjust width as needed to contain the animation */
+    vertical-align: bottom; /* Align dots with text baseline */
+}
+
+.thinking-dots::after {
+    content: ' .';
+    animation: dots 1s steps(5, end) infinite;
+}
+.thinking-dots::before {
+    content: '.';
+    animation: dots 1s steps(5, end) infinite;
+}
+
+@keyframes dots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+    100% { content: ''; }
+}
+
+/* Ensure user and bot messages have distinct styling for the chat bubbles */
+.chat-message.user-message {
+    background-color: #3498db; /* Your blue color */
+    color: white;
+    align-self: flex-end; /* Align to right */
+    margin-left: auto;
+    border-bottom-right-radius: 3px;
+}
+.chat-message.bot-message {
+    background-color: #ecf0f1; /* Light grey */
+    color: #333;
+    align-self: flex-start; /* Align to left */
+    border-bottom-left-radius: 3px;
+}
+
 @keyframes loading-animation {
     0% { left: -50%; }
     50% { left: 100%; }
@@ -323,24 +364,161 @@ textarea {
 /* --- Chatbot Interface --- */
 .chat-container {
     display: flex;
-    flex-direction: row;
+    flex-direction: row; /* Arranges main and sidebar horizontally */
     gap: 20px;
     height: 100%;
     overflow: hidden;
 }
-.chatbot-main-area {
+
+/* Adjust chatbot sidebar positioning and size */
+.chatbot-sidebar {
+    width: 250px; /* Adjust as desired, maybe 300px if content needs more space */
+    flex-shrink: 0; /* Prevent shrinking */
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #ddd;
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
+    gap: 10px;
+    text-align: center;
+    order: 2; /* Visually places it to the right */
+}
+
+.chatbot-main-area {
+    flex-grow: 1; /* Takes remaining space */
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     text-align: left;
+    order: 1; /* Visually places it to the left */
 }
+
+/* Adjust the clear history button positioning within the h3 */
+.chatbot-main-area h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Pushes button to right */
+    margin-top: 0;
+    margin-bottom: 10px; /* Space from chat messages */
+}
+
+.chatbot-main-area h3 .btn { /* Style for clear history button inside h3 */
+    margin-left: 15px;
+    padding: 5px 10px;
+    font-size: 13px;
+    flex-shrink: 0; /* Prevent it from shrinking */
+    background-color: #3498db; /* Example color, match your design */
+}
+.chatbot-main-area h3 .btn:hover {
+    background-color: #2980b9;
+}
+
+
+/* Reduce size of canvas-files-list into a more compact area */
+#canvas-files-list {
+    max-height: 100px; /* Reduced height for list */
+    overflow-y: auto;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    min-height: 40px; /* Smaller minimum height */
+    text-align: left;
+    margin-bottom: 5px;
+    font-size: 13px; /* Smaller font for list items */
+}
+
+.knowledge-file-item {
+    padding: 2px 0; /* Less padding */
+    font-size: 12px; /* Smaller font */
+    display: flex; /* Allow for delete button layout if added later */
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+}
+.knowledge-file-item:last-child {
+    border-bottom: none; /* No border for the last item */
+}
+
+
+/* Styling for chat input area and buttons */
 .chat-input-area {
     display: flex;
     gap: 10px;
-    align-items: center;
+    align-items: flex-end; /* Align items to the bottom */
     flex-shrink: 0;
+    padding-top: 10px; /* Space above input */
 }
+
+#chatInput {
+    flex-grow: 1;
+    min-height: 40px; /* Match button height */
+    max-height: 120px; /* Still allow expansion */
+    resize: vertical;
+    padding: 8px 12px; /* Adjust padding */
+    font-size: 15px;
+}
+
+#attachFileBtn {
+    height: 40px; /* Match chat input height */
+    width: 40px; /* Make it square */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px; /* Larger paperclip icon */
+    padding: 0; /* Remove padding to make it a square */
+    line-height: 1; /* Ensure icon is vertically centered */
+    /* Add color/background if not already styled by .btn */
+    background-color: #e7e7e7; /* Example light grey */
+    color: #555;
+    border: 1px solid #ccc;
+}
+#attachFileBtn:hover {
+    background-color: #d7d7d7;
+}
+
+#sendMessageBtn {
+    height: 40px; /* Match chat input height */
+    padding: 0 15px; /* Adjust padding */
+}
+
+#ephemeral-files-display {
+    font-size: 13px;
+    background-color: #f0f0f0;
+    padding: 5px 10px;
+    border-radius: 4px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px dashed #bbb; /* Make it more prominent */
+}
+#ephemeral-files-display strong {
+    margin-right: 5px;
+    color: #333;
+}
+#ephemeral-files-display #ephemeral-files-list {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 10px;
+    color: #666;
+}
+#ephemeral-files-display #clearEphemeralFilesBtn {
+    background: none;
+    border: none;
+    color: #dc3545; /* Red 'x' */
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 5px;
+}
+
+/* Ensure chat messages container takes available space */
 #chatMessages {
     flex-grow: 1;
     overflow-y: auto;
@@ -352,95 +530,7 @@ textarea {
     flex-direction: column;
     gap: 8px;
     margin-bottom: 10px;
-    min-height: 0;
-}
-.chat-message {
-    padding: 8px 12px;
-    border-radius: 15px;
-    max-width: 80%;
-    word-wrap: break-word;
-    line-height: 1.4;
-}
-.user-message {
-    background-color: #3498db;
-    color: white;
-    align-self: flex-end;
-    margin-left: auto;
-    border-bottom-right-radius: 3px;
-}
-.bot-message, .bot-error {
-    background-color: #ecf0f1;
-    color: #333;
-    align-self: flex-start;
-    border-bottom-left-radius: 3px;
-}
-.bot-error {
-    background-color: #ffdddd;
-    border: 1px solid #e74c3c;
-    color: #c0392b;
-}
-#chatInput {
-    min-height: 60px;
-    max-height: 150px;
-    text-align: left;
-    flex-grow: 1;
-}
-#attachFileBtn, #sendMessageBtn {
-    flex-shrink: 0;
-}
-.chatbot-sidebar {
-    width: 320px;
-    flex-shrink: 0;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    text-align: center;
-}
-.chatbot-sidebar h4 {
-    margin: 0;
-}
-.chatbot-sidebar .controls {
-    display: flex;
-    flex-direction: row;
-    gap: 10px;
-}
-.chatbot-sidebar .controls .btn {
-    flex-grow: 1;
-    margin: 0;
-}
-.knowledge-file-list-container, #canvas-files-list {
-    max-height: 200px;
-    overflow-y: auto;
-    background-color: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 8px;
-    min-height: 80px;
-    text-align: left;
-    margin-bottom: 10px;
-}
-#canvas-files-list {
-    flex-grow: 1;
-    margin-bottom: 0;
-}
-.knowledge-file-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px;
-    font-size: 13px;
-    border-bottom: 1px solid #eee;
-}
-.delete-knowledge-file-btn {
-    border: none;
-    background: none;
-    color: #dc3545;
-    cursor: pointer;
-    font-weight: bold;
+    min-height: 0; /* Allow it to shrink if needed */
 }
 
 /* --- AI Image Studio --- */

@@ -53,6 +53,12 @@
 
             <section id="dashboardView" class="view-section dashboard-container active">
                 <div class="tool-section">
+                    <h3>Account Balance</h3>
+                    <p>AI Coins are used by AI-powered features.</p>
+                    <p><span id="coinCount">0.0000</span> AI Coins</p>
+                    <button id="viewAccountBtn" class="btn" style="margin-top: 10px;">View Account Details</button>
+                </div>
+                <div class="tool-section">
                     <h3>Output Settings</h3>
                     <p>All generated files will be saved to this folder.</p>
                     <button id="openOutputFolderBtn" class="btn">Open Output Folder</button>
@@ -79,12 +85,6 @@
                         <button id="addToKnowledgeBtn" class="btn">Add Knowledge File(s)</button>
                         <button id="clearKnowledgeBtn" class="btn btn-secondary">Clear All Knowledge</button>
                     </div>
-                </div>
-
-                <div class="tool-section">
-                    <h3>Account Balance</h3>
-                    <p>AI Coins are used by AI-powered features.</p>
-                    <button id="viewAccountBtn" class="btn" style="margin-top: 10px;">View Account Details</button>
                 </div>
             </section>
 
@@ -274,31 +274,31 @@
             </section>
 
             <section id="chatbotView" class="view-section chat-container">
-                <div class="chatbot-main-area">
-                    <h3><img src="../assets/google_ai_logo.svg" alt="Powered by Google AI" class="google-ai-logo"> Meet Gemma! Your built-in AI helper.</h3>
-                    <button id="clearChatHistoryBtn" class="btn">Clear History</button>
-                    <div id="chatMessages"></div>
-                    <div id="ephemeral-files-display" class="hidden">
-                        <strong>Attached:</strong> <span id="ephemeral-files-list"></span>
-                        <button id="clearEphemeralFilesBtn">&times;</button>
-                    </div>
-                    <div class="chat-input-area">
-                        <button id="attachFileBtn" class="btn" title="Attach file to this message">📎</button>
-                        <textarea id="chatInput" placeholder="Type your message..."></textarea>
-                        <button id="sendMessageBtn" class="btn btn-primary">Send</button>
-                    </div>
-                </div>
-                <aside class="chatbot-sidebar">
-                    <h4>Focus Canvas</h4>
-                    <p>Files here are the primary focus for the entire session.</p>
-                    <div id="canvas-files-list">
-                        </div>
-                    <div class="controls">
-                        <button id="addToCanvasBtn" class="btn">Add File(s) to Canvas</button>
-                        <button id="clearCanvasBtn" class="btn btn-secondary">Clear Canvas</button>
-                    </div>
-                </aside>
-            </section>
+    <aside class="chatbot-sidebar"> <h4>Focus Canvas</h4>
+        <p>Files here are the primary focus for the entire session.</p>
+        <div id="canvas-files-list">
+        </div>
+        <div class="controls">
+            <button id="addToCanvasBtn" class="btn">Add File(s) to Canvas</button>
+            <button id="clearCanvasBtn" class="btn btn-secondary">Clear Canvas</button>
+        </div>
+    </aside>
+
+    <div class="chatbot-main-area">
+        <h3><img src="../assets/google_ai_logo.svg" alt="Powered by Google AI" class="google-ai-logo"> Meet Gemma! Your built-in AI helper.
+            <button id="clearChatHistoryBtn" class="btn">Clear History</button> </h3>
+        <div id="chatMessages"></div>
+        <div id="ephemeral-files-display" class="hidden">
+            <strong>Attached:</strong> <span id="ephemeral-files-list"></span>
+            <button id="clearEphemeralFilesBtn">&times;</button>
+        </div>
+        <div class="chat-input-area">
+            <button id="attachFileBtn" class="btn" title="Attach file to this message">📎</button>
+            <textarea id="chatInput" placeholder="Type your message..."></textarea>
+            <button id="sendMessageBtn" class="btn btn-primary">Send</button>
+        </div>
+    </div>
+</section>
 
             <section id="helpView" class="view-section tool-container">
                 <h3>Contact Support</h3>
@@ -309,6 +309,6 @@
         </main>
     </div>
 
-    <script type="module" src="companion_renderer.js"></script>
+    <script type="module" src="renderer.js"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@ import os
 import httpx
 import requests
 import json
+import math # Added for math.ceil
 from openai import OpenAI
 from logger import setup_logger
 
@@ -13,19 +14,20 @@ logger = setup_logger('api_clients')
 # =============================================================================
 # SECTION 2: PRICING & MARKUP CONFIGURATION (FROM .ENV)
 # =============================================================================
-# This is the single source of truth for your app's economy.
 
 # --- STEP 1: Define the raw cost in USD charged by the API provider.
+# Prices are per 1,000,000 tokens for text models, or per unit for image models.
 MODEL_PRICING_USD = {
-    "google/gemma-2-27b-it": {"input": 0.84, "output": 0.84},
+    "google/gemma-3-27b-it": {"input": 0.84, "output": 0.84},
+    "google/gemma-3n-e4b-it": {"input": 0.84, "output": 0.84},
     "google/gemini-2.5-flash": {"input": 0.315, "output": 2.625},
     "google/gemini-2.5-pro": {"input": 1.3125, "output": 10.5},
     "google/textembedding-gecko@003": {"input": 0.15},
-    "deepai_standard": {"image": 0.01}
+    "deepai_standard": {"image": 0.01} # This is the cost per "standard image click" from DeepAI
 }
 
 # --- STEP 2: Load your business markup rules from environment variables.
-# This keeps your business logic private and configurable.
+
 try:
     DEFAULT_MARKUP_MULTIPLIER = float(os.environ.get('DEFAULT_MARKUP_MULTIPLIER', 2.0))
     CUSTOM_MODEL_MARKUPS = json.loads(os.environ.get('CUSTOM_MODEL_MARKUPS', '{}'))
@@ -34,16 +36,34 @@ except (ValueError, json.JSONDecodeError) as e:
     DEFAULT_MARKUP_MULTIPLIER = 2.0
     CUSTOM_MODEL_MARKUPS = {}
 
-def calculate_coin_cost(cost_usd, model_id=None):
-    """
-    Calculates the final cost in "AI Coins" to be charged to the user.
-    It checks for a custom markup first, then falls back to the default.
-    """
-    markup_multiplier = CUSTOM_MODEL_MARKUPS.get(model_id, DEFAULT_MARKUP_MULTIPLIER)
-    if model_id and model_id in CUSTOM_MODEL_MARKUPS:
-        logger.info(f"Applying custom markup of {markup_multiplier}x for model '{model_id}'.")
+def calculate_coin_cost(units_used, model_id, is_input=True):
+
+    if model_id == "deepai_standard":
+        # For DeepAI, units_used directly represents the number of "image" cost units
+        cost_usd_raw = MODEL_PRICING_USD["deepai_standard"]["image"] * units_used
+    else:
+        model_costs = MODEL_PRICING_USD.get(model_id)
+        if not model_costs:
+            logger.error(f"Pricing not defined for model: {model_id}. Using default markup on 0 cost.")
+            cost_usd_raw = 0.0
+        else:
+            # Assuming units_used for non-DeepAI models refers to tokens
+            price_per_million_tokens = model_costs["input"] if is_input else model_costs["output"]
+            cost_usd_raw = (units_used / 1_000_000) * price_per_million_tokens
     
-    return cost_usd * markup_multiplier
+    markup_multiplier = CUSTOM_MODEL_MARKUPS.get(model_id, DEFAULT_MARKUP_MULTIPLIER)
+    final_cost_usd = cost_usd_raw * markup_multiplier
+    
+    # Round up to 5 decimal places for AI Coins
+    precision_factor = 100000 
+    coins_to_deduct = math.ceil(final_cost_usd * precision_factor) / precision_factor
+    
+    if model_id and model_id in CUSTOM_MODEL_MARKUPS:
+        logger.info(f"Applying custom markup of {markup_multiplier}x for model '{model_id}'. Raw USD: {cost_usd_raw:.8f}, Final Coins: {coins_to_deduct:.5f}.")
+    else:
+        logger.info(f"Applying default markup of {markup_multiplier}x. Raw USD: {cost_usd_raw:.8f}, Final Coins: {coins_to_deduct:.5f}.")
+
+    return coins_to_deduct
 
 # =============================================================================
 # SECTION 3: CLIENT INITIALIZATION (SINGLETON PATTERN)
@@ -51,7 +71,6 @@ def calculate_coin_cost(cost_usd, model_id=None):
 _clients = {}
 
 def get_aimlapi_client():
-    """Returns a shared instance of the AIMLAPI client."""
     if 'aimlapi' not in _clients:
         api_key = os.environ.get('AIML_API_KEY')
         if not api_key: raise ValueError("CRITICAL: AIML_API_KEY not found.")
@@ -67,7 +86,6 @@ def get_aimlapi_client():
     return _clients['aimlapi']
 
 def get_deepai_key():
-    """Securely retrieves the DeepAI API key."""
     api_key = os.environ.get('DEEP_AI_KEY')
     if not api_key: raise ValueError("CRITICAL: DEEP_AI_KEY not found.")
     return api_key
@@ -78,34 +96,29 @@ def get_deepai_key():
 # These are the standardized functions that other scripts will call.
 
 def call_chatbot_model(messages, model_id="google/gemma-3n-e4b-it"):
-    """Handles calls for chat-style completions."""
     client = get_aimlapi_client()
     response = client.chat.completions.create(model=model_id, messages=messages)
     
     usage = response.usage
-    input_cost_usd = (usage.prompt_tokens / 1_000_000) * MODEL_PRICING_USD[model_id]["input"]
-    output_cost_usd = (usage.completion_tokens / 1_000_000) * MODEL_PRICING_USD[model_id]["output"]
-    total_cost_usd = input_cost_usd + output_cost_usd
-    coins_to_deduct = calculate_coin_cost(total_cost_usd, model_id)
+    input_coins = calculate_coin_cost(usage.prompt_tokens, model_id, is_input=True)
+    output_coins = calculate_coin_cost(usage.completion_tokens, model_id, is_input=False)
+    total_coins_to_deduct = input_coins + output_coins
     
-    logger.info(f"Chat completion call ({model_id}) cost ${total_cost_usd:.6f}, deducting {coins_to_deduct:.4f} AI Coins.")
-    return response, coins_to_deduct
+    logger.info(f"Chat completion call ({model_id}) input tokens: {usage.prompt_tokens}, output tokens: {usage.completion_tokens}. Deducting {total_coins_to_deduct:.5f} AI Coins.")
+    return response, total_coins_to_deduct
 
 def call_embedding_model(text_chunks):
-    """Handles calls to create text embeddings for RAG."""
     client = get_aimlapi_client()
     model_id = "google/textembedding-gecko@003"
     response = client.embeddings.create(model=model_id, input=text_chunks)
     
     usage = response.usage
-    total_cost_usd = (usage.total_tokens / 1_000_000) * MODEL_PRICING_USD[model_id]["input"]
-    coins_to_deduct = calculate_coin_cost(total_cost_usd, model_id)
+    coins_to_deduct = calculate_coin_cost(usage.total_tokens, model_id, is_input=True)
     
-    logger.info(f"Embedding call ({model_id}) cost ${total_cost_usd:.6f}, deducting {coins_to_deduct:.4f} AI Coins.")
+    logger.info(f"Embedding call ({model_id}) total tokens: {usage.total_tokens}. Deducting {coins_to_deduct:.5f} AI Coins.")
     return response, coins_to_deduct
 
-def call_summarizer_model(prompt, model_id="google/gemini-2.5-flash"):
-    """Handles calls for general summarization tasks."""
+def call_summarizer_model(prompt, model_id="google/gemma-3-27b-it"):
     client = get_aimlapi_client()
     response = client.chat.completions.create(
         model=model_id,
@@ -113,17 +126,15 @@ def call_summarizer_model(prompt, model_id="google/gemini-2.5-flash"):
     )
     
     usage = response.usage
-    input_cost_usd = (usage.prompt_tokens / 1_000_000) * MODEL_PRICING_USD[model_id]["input"]
-    output_cost_usd = (usage.completion_tokens / 1_000_000) * MODEL_PRICING_USD[model_id]["output"]
-    total_cost_usd = input_cost_usd + output_cost_usd
-    coins_to_deduct = calculate_coin_cost(total_cost_usd, model_id)
+    input_coins = calculate_coin_cost(usage.prompt_tokens, model_id, is_input=True)
+    output_coins = calculate_coin_cost(usage.completion_tokens, model_id, is_input=False)
+    total_coins_to_deduct = input_coins + output_coins
 
-    logger.info(f"Summarizer call ({model_id}) cost ${total_cost_usd:.6f}, deducting {coins_to_deduct:.4f} AI Coins.")
+    logger.info(f"Summarizer call ({model_id}) input tokens: {usage.prompt_tokens}, output tokens: {usage.completion_tokens}. Deducting {total_coins_to_deduct:.5f} AI Coins.")
     summary = response.choices[0].message.content.strip()
-    return summary, coins_to_deduct
+    return summary, total_coins_to_deduct
 
 def call_deepai_model(endpoint, files=None, data=None):
-    """Handles all calls to the DeepAI API."""
     api_key = get_deepai_key()
     response = requests.post(
         f"https://api.deepai.org/api/{endpoint}",
@@ -131,8 +142,15 @@ def call_deepai_model(endpoint, files=None, data=None):
     )
     response.raise_for_status()
     
-    cost_usd = MODEL_PRICING_USD["deepai_standard"]["image"]
-    coins_to_deduct = calculate_coin_cost(cost_usd)
+    # Default to 1 unit for now, representing a 'standard click'
+    # You will need to expand this mapping based on actual DeepAI endpoints
+    # and their associated costs from their pricing page (deepai.org/pricing).
+    # For example:
+    # if endpoint == "text2img": deepai_cost_units = 1
+    # elif endpoint == "super-resolution": deepai_cost_units = 5 # Example: if it costs 5x a standard image
+    # else: deepai_cost_units = 1 # Fallback for unknown endpoints
+    deepai_cost_units = 1 
+    coins_to_deduct = calculate_coin_cost(deepai_cost_units, "deepai_standard")
 
-    logger.info(f"DeepAI call ({endpoint}) cost ${cost_usd:.2f}, deducting {coins_to_deduct:.4f} AI Coins.")
+    logger.info(f"DeepAI call ({endpoint}) deducting {coins_to_deduct:.5f} AI Coins. ({deepai_cost_units} cost units)")
     return response.json(), coins_to_deduct

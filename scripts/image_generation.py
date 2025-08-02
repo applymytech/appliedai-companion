@@ -3,86 +3,130 @@
 # =============================================================================
 import os
 import json
-import base64
 from logger import setup_logger
-# Import the new, centralized API call wrapper
-from api_clients import call_deepai_model
+from api_clients import call_deepai_model 
+import requests 
 
 logger = setup_logger('image_generation')
 
 # =============================================================================
-# SECTION 2: CORE LOGIC FUNCTIONS
+# SECTION 2: CORE IMAGE GENERATION LOGIC
 # =============================================================================
-# These functions now only prepare data and call the wrapper from api_clients.py.
-# They do not handle API keys or make direct web requests.
 
-def text_to_image(prompt):
-    """Generates an image from a text prompt."""
-    data = {'text': prompt}
-    return call_deepai_model('text2img', data=data)
+def _process_image_generation(tool_type, prompt=None, image_path=None, width=None, height=None, img_gen_version=None, genius_pref=None, negative_prompt=None):
 
-def toonify_image(image_path):
-    """Applies a cartoon effect to an image."""
-    with open(image_path, 'rb') as image_file:
-        files = {'image': image_file}
-        return call_deepai_model('toonify', files=files)
+    coins_used = 0
+    deepai_endpoint = None
+    files_param = None
+    data_param = {}
 
-def upscale_image(image_path):
-    """Upscales an image using the torch-srgan model."""
-    with open(image_path, 'rb') as image_file:
-        files = {'image': image_file}
-        return call_deepai_model('torch-srgan', files=files)
+    # Map tool_type to DeepAI endpoint and prepare parameters
+    if tool_type == 'text2img':
+        deepai_endpoint = "text2img" 
+        if not prompt:
+            return {"error": "Prompt is required for Text to Image.", "coins_used": 0}
+        data_param['text'] = prompt 
+        if width: data_param['width'] = str(width) 
+        if height: data_param['height'] = str(height) 
+        if img_gen_version: data_param['image_generator_version'] = img_gen_version 
+        if genius_pref: data_param['genius_preference'] = genius_pref 
+        if negative_prompt: data_param['negative_prompt'] = negative_prompt 
 
-# Add other DeepAI tool functions here following the same pattern...
+    elif tool_type == 'ghibli-style':
+        deepai_endpoint = "studio-ghibli" 
+        if not image_path:
+            return {"error": "Input image is required for Ghibli Style.", "coins_used": 0}
+        files_param = {'image': open(image_path, 'rb')} 
 
-# =============================================================================
-# SECTION 3: ADAPTER FUNCTION FOR SCRIPT ROUTER
-# =============================================================================
-def generate_image_adapter(payload, output_dir):
-    """
-    Adapter function that routes to the correct image generation tool
-    based on the payload from the frontend.
-    """
-    tool_type = payload.get('type')
-    params = payload.get('params', {})
-    
-    if not tool_type:
-        return {"error": "No image generation tool type specified.", "coins_used": 0}
+    elif tool_type == 'toonify':
+        deepai_endpoint = "toonify" # Assumed based on common DeepAI tools
+        if not image_path:
+            return {"error": "Input image is required for Toonify.", "coins_used": 0}
+        files_param = {'image': open(image_path, 'rb')}
 
-    logger.info(f"Routing to image generation tool: {tool_type}")
+    elif tool_type == 'image-editor':
+        deepai_endpoint = "image-editor" 
+        if not image_path:
+            return {"error": "Input image is required for AI Photo Editor.", "coins_used": 0}
+        if not prompt: # Image editor also takes text prompt 
+            return {"error": "Text prompt is required for AI Photo Editor.", "coins_used": 0}
+        files_param = {'image': open(image_path, 'rb')} 
+        data_param['text'] = prompt # DeepAI uses 'text' for description in image editor 
+
+    elif tool_type == 'torch-srgan': # Super Resolution
+        deepai_endpoint = "torch-srgan" 
+        if not image_path:
+            return {"error": "Input image is required for Super Resolution.", "coins_used": 0}
+        files_param = {'image': open(image_path, 'rb')} 
+
+    elif tool_type == 'waifu2x': # Premium Upscaler
+        deepai_endpoint = "waifu2x" 
+        if not image_path:
+            return {"error": "Input image is required for Premium Upscaler.", "coins_used": 0}
+        files_param = {'image': open(image_path, 'rb')} 
+
+    elif tool_type == 'background-remover':
+        deepai_endpoint = "background-remover" 
+        if not image_path:
+            return {"error": "Input image is required for Background Remover.", "coins_used": 0}
+        files_param = {'image': open(image_path, 'rb')} 
+        # Note: The output format forced to PNG will be handled in image_conversion.py or a post-processing step
+
+    # --- Call DeepAI API ---
+    if not deepai_endpoint:
+        return {"error": f"Unknown or unsupported image generation tool: {tool_type}", "coins_used": 0}
 
     try:
-        if tool_type == 'text2img':
-            prompt = params.get('text')
-            if not prompt: return {"error": "Prompt is required for text-to-image.", "coins_used": 0}
-            result_data, coins_used = text_to_image(prompt)
+        response_json, coins = call_deepai_model(deepai_endpoint, files=files_param, data=data_param)
+        coins_used += coins
         
-        elif tool_type == 'toonify':
-            image_path = params.get('image')
-            if not image_path: return {"error": "Image path is required for toonify.", "coins_used": 0}
-            result_data, coins_used = toonify_image(image_path)
-            
-        elif tool_type == 'torch-srgan':
-            image_path = params.get('image')
-            if not image_path: return {"error": "Image path is required for upscaling.", "coins_used": 0}
-            result_data, coins_used = upscale_image(image_path)
-            
-        # Add other tool routes here...
+        if 'output_url' in response_json:
+            result = {"image_url": response_json['output_url'], "message": f"{tool_type.replace('-', ' ').title()} completed successfully."}
+        elif 'id' in response_json and 'output_url' not in response_json: # Some DeepAI APIs might return an ID and process asynchronously or have different output keys
+            result = {"message": f"{tool_type.replace('-', ' ').title()} job submitted. Check DeepAI for result. (ID: {response_json['id']})", "image_url": None}
         else:
-            return {"error": f"Unknown image generation tool: '{tool_type}'", "coins_used": 0}
+            result = {"error": f"DeepAI API failed for {tool_type}: {response_json.get('err') or response_json}", "coins_used": coins_used}
 
-        # Process the successful response
-        if 'output_url' in result_data:
-            # For DeepAI, we need to download the generated image
-            import requests
-            image_response = requests.get(result_data['output_url'])
-            image_response.raise_for_status()
-            image_base64 = base64.b64encode(image_response.content).decode('utf-8')
-            return {"image_base64": image_base64, "coins_used": coins_used}
-        else:
-            logger.error(f"DeepAI response for '{tool_type}' did not contain 'output_url'. Response: {result_data}")
-            return {"error": "Failed to retrieve image from API response.", "coins_used": coins_used}
-
+    except requests.exceptions.RequestException as e:
+        logger.error(f"DeepAI API request failed for {tool_type}: {e}", exc_info=True)
+        result = {"error": f"DeepAI API request failed: {e}", "coins_used": coins_used}
     except Exception as e:
-        logger.error(f"An error occurred in generate_image_adapter for tool '{tool_type}': {e}", exc_info=True)
-        return {"error": str(e), "coins_used": 0}
+        logger.error(f"An unexpected error occurred during image generation for {tool_type}: {e}", exc_info=True)
+        result = {"error": f"An unexpected error occurred: {e}", "coins_used": coins_used}
+    finally:
+        # Ensure any opened file handles are closed
+        if files_param and 'image' in files_param and hasattr(files_param['image'], 'close'):
+            files_param['image'].close()
+        
+    result["coins_used"] = coins_used # Ensure coins_used is always returned in final result
+    return result
+
+# =============================================================================
+# SECTION 3: ADAPTER FUNCTIONS FOR SCRIPT ROUTER
+# =============================================================================
+# This section remains unchanged from previous instructions for generate_image_adapter
+def generate_image_adapter(payload, output_dir):
+    tool_type = payload.get('tool')
+    prompt = payload.get('prompt')
+    image_path = payload.get('image_path')
+    # Add other parameters from UI if available
+    width = payload.get('width')
+    height = payload.get('height')
+    img_gen_version = payload.get('image_generator_version')
+    genius_pref = payload.get('genius_preference')
+    negative_prompt = payload.get('negative_prompt')
+
+    if not tool_type:
+        logger.error("No image generation tool type specified in payload.")
+        return {"error": "No image generation tool type specified.", "coins_used": 0}
+
+    logger.info(f"Generating image with tool: '{tool_type}'")
+    
+    try:
+        # Pass all relevant parameters to the core processing function
+        result = _process_image_generation(tool_type, prompt, image_path, width, height, img_gen_version, genius_pref, negative_prompt)
+        logger.info(f"Image generation for '{tool_type}' completed. Result: {result.get('message', result.get('error'))}")
+        return result
+    except Exception as e:
+        logger.error(f"Error in generate_image_adapter for tool '{tool_type}': {e}", exc_info=True)
+        return {"error": f"Image generation failed: {e}", "coins_used": 0}
