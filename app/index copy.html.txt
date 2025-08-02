@@ -84,7 +84,7 @@
                 <div class="tool-section">
                     <h3>Account Balance</h3>
                     <p>AI Coins are used by AI-powered features.</p>
-                    <button id="viewAccountBtn" class="btn" style="margin-top: 10px;">View Account Details</button>
+                    <p><span id="coinCount">0.0000</span> AI Coins</p>
                 </div>
             </section>
 

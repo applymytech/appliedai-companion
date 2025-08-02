@@ -1,7 +1,7 @@
 # =============================================================================
 # SECTION 1: DEPENDENCIES & SETUP
 # =============================================================================
-import os # FIXED: Added missing import
+import os
 import json
 from logger import setup_logger
 # Import the abstraction layer functions, not the clients themselves
@@ -12,52 +12,60 @@ logger = setup_logger('ai_utils')
 # =============================================================================
 # SECTION 2: CORE AI UTILITY FUNCTIONS
 # =============================================================================
-# These functions contain the business logic and prompt engineering for
-# specialized, non-chatbot AI tasks. They rely on api_clients.py for execution.
 
 def get_ai_log_summary(log_content):
-    """
-    Creates a prompt and calls the summarizer model to analyze log files.
-    """
+
     prompt = f"Summarize the following application log, highlighting any errors or critical warnings:\n\n{log_content[-4000:]}"
     try:
-        # Use a more powerful model for this critical task
-        summary, cost = call_summarizer_model(prompt, model_id="google/gemini-2.5-pro")
+        summary, cost = call_summarizer_model(prompt, model_id="google/gemma-3-27b-it")
         return summary, cost
     except Exception as e:
         logger.error(f"Error generating log summary: {e}", exc_info=True)
         return "Log summary could not be generated due to an API error.", 0
 
 def get_ai_quality_check(text_content):
-    """
-    Creates a prompt and calls an AI model to perform a quality check on text.
-    This is the bonus feature for verifying conversions.
-    """
+
     prompt = f"Review the following text extracted from a document. Does it appear to be a high-quality conversion, or is it garbled and nonsensical? Respond with only one of the following words: Passed, Failed, or Needs Review.\n\nText:\n\"{text_content[:2000]}\""
     try:
-        # Use the standard chatbot model for this simple classification task
         response, cost = call_chatbot_model([{"role": "user", "content": prompt}])
         result = response.choices[0].message.content.strip()
         
-        # Ensure the response is one of the expected values for robustness
         valid_responses = ["Passed", "Failed", "Needs Review"]
         if result not in valid_responses:
             logger.warning(f"AI quality check returned an unexpected value: '{result}'")
-            return "Needs Review", cost # Default to caution
+            return "Needs Review", cost
             
         return result, cost
     except Exception as e:
         logger.error(f"Error performing quality check: {e}", exc_info=True)
         return "Error", 0
 
-# NOTE: You would continue this pattern for all other utility functions
-# that were previously in this file (e.g., get_ai_prettyname, get_ai_chat_summary).
+def get_ai_prettyname(filename):
+
+    prompt = f"Generate a short, human-readable name for a file originally named '{filename}'. For example, 'report_q3_final_rev2.pdf' could become 'Q3 Final Report'. Respond with only the name itself."
+    try:
+        pretty_name, cost = call_summarizer_model(prompt)
+        # Clean up the response to remove potential quotes
+        return pretty_name.strip().replace('"', ''), cost
+    except Exception as e:
+        logger.error(f"Error generating pretty name for {filename}: {e}", exc_info=True)
+        return filename, 0 # Fallback to original filename
+
+def get_ai_chat_summary(chat_history):
+
+    # Format the chat history for the prompt
+    formatted_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
+    prompt = f"Please provide a concise, one-pragraph summary of the following conversation:\n\n{formatted_history}"
+    try:
+        summary, cost = call_summarizer_model(prompt)
+        return summary.strip(), cost
+    except Exception as e:
+        logger.error(f"Error generating chat summary: {e}", exc_info=True)
+        return "Summary unavailable.", 0
 
 # =============================================================================
 # SECTION 3: ADAPTER FUNCTIONS FOR SCRIPT ROUTER
 # =============================================================================
-# These "adapter" functions are the entry points called by script_router.py.
-# They handle parsing the payload and returning a JSON-serializable dictionary.
 
 def get_ai_log_summary_adapter(payload, output_dir):
     log_file_path = payload.get('log_file_path', '')
@@ -77,3 +85,19 @@ def get_ai_quality_check_adapter(payload, output_dir):
 
     result, cost = get_ai_quality_check(text_content)
     return {"quality_result": result, "coins_used": cost}
+
+def get_ai_prettyname_adapter(payload, output_dir):
+    filename = payload.get('filename', '')
+    if not filename:
+        return {"error": "No filename provided.", "coins_used": 0}
+    
+    pretty_name, cost = get_ai_prettyname(filename)
+    return {"pretty_name": pretty_name, "coins_used": cost}
+
+def get_ai_chat_summary_adapter(payload, output_dir):
+    chat_history = payload.get('history', [])
+    if not chat_history:
+        return {"error": "No chat history provided.", "coins_used": 0}
+        
+    summary, cost = get_ai_chat_summary(chat_history)
+    return {"summary": summary, "coins_used": cost}

@@ -77,7 +77,7 @@ def get_deepai_key():
 # =============================================================================
 # These are the standardized functions that other scripts will call.
 
-def call_chatbot_model(messages, model_id="google/gemma-2-27b-it"):
+def call_chatbot_model(messages, model_id="google/gemma-3n-e4b-it"):
     """Handles calls for chat-style completions."""
     client = get_aimlapi_client()
     response = client.chat.completions.create(model=model_id, messages=messages)

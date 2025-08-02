@@ -79,7 +79,7 @@ async function initializeAccountPage(uid) {
     // --- Real-time Listener for User Tokens ---
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
-            userTokensSpan.textContent = docSnap.data().tokens;
+            userTokensSpan.textContent = docSnap.data().coins;
         }
     }, (error) => {
         console.error(`[Account Page] Real-time listener failed: ${error.message}`);
@@ -94,14 +94,14 @@ async function initializeAccountPage(uid) {
             // Populate UI
             userNameSpan.textContent = data.name || "User";
             userEmailSpan.textContent = data.email;
-            userTokensSpan.textContent = data.tokens;
+            userTokensSpan.textContent = data.coins;
 
             // FIX: Store the fetched data in sessionStorage for the main app.
             // This prepares the necessary data for the next page (companion_renderer.js).
             sessionStorage.setItem('userUID', uid);
             sessionStorage.setItem('userName', data.name || "User");
             sessionStorage.setItem('userEmail', data.email);
-            sessionStorage.setItem('userTokens', data.tokens);
+            sessionStorage.setItem('userCoins', data.coins);
 
             // Show account info and hide loading indicators
             loadingSpinner.classList.add('hidden');

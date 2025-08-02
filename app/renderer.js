@@ -1,18 +1,17 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-    // --- Authentication & Page Navigation ---
+    // --- Specific functions for Login/Account flow ---
     loadAccountPage: () => ipcRenderer.send('load-account-page'),
     startMainApp: () => ipcRenderer.send('start-main-app'),
     returnToLogin: () => ipcRenderer.send('return-to-login'),
+
+    // --- Generic Navigation for Main App ---
+    navigate: (page) => ipcRenderer.send('navigate', page),
     
     // --- User & Firebase Data ---
-    getUserData: () => ({
-        uid: sessionStorage.getItem('userUID'),
-        name: sessionStorage.getItem('userName'),
-        email: sessionStorage.getItem('userEmail'),
-        tokens: sessionStorage.getItem('userTokens')
-    }),
+    getUserData: () => ipcRenderer.invoke('get-user-data'), // <-- THIS WAS THE MISSING FUNCTION
+    updateFinalCoinBalance: (data) => ipcRenderer.send('update-final-coin-balance', data),
     firebaseConfig: {
         apiKey: process.env.FIREBASE_API_KEY,
         authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -26,19 +25,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     runScript: (args) => ipcRenderer.send('run-script', args),
     onScriptReply: (callback) => ipcRenderer.on('script-reply', (_event, value) => callback(value)),
 
-    // --- File & Folder Operations ---
-    getOutputPath: () => ipcRenderer.invoke('get-output-path'),
-    openOutputFolder: () => ipcRenderer.send('open-output-folder'),
-    changeOutputFolder: () => ipcRenderer.send('change-output-folder'),
-    resetOutputFolder: () => ipcRenderer.send('reset-output-folder'),
-    onOutputPathChanged: (callback) => ipcRenderer.on('output-path-changed', (_event, value) => callback(value)),
-    selectFiles: (options) => ipcRenderer.invoke('select-files', options),
-    selectFolder: () => ipcRenderer.invoke('select-folder'),
-    
-    // ADDED: Expose the confirmation dialog function
-    showConfirmDialog: (options) => ipcRenderer.invoke('show-confirm-dialog', options),
+    // --- Settings & Store ---
+    getStoreValue: (key) => ipcRenderer.invoke('store:get', key),
+    setStoreValue: (key, value) => ipcRenderer.send('store:set', { key, value }),
+    getDefaultPath: () => ipcRenderer.invoke('get-default-path'),
 
+    // --- Dialogs & System ---
+    showOpenFileDialog: (options) => ipcRenderer.invoke('dialog:openFile', options),
+    showOpenDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
+    showConfirmDialog: (options) => ipcRenderer.invoke('dialog:showMessageBox', options),
+    openPath: (path) => ipcRenderer.send('shell:openPath', path),
+    openExternalLink: (url) => ipcRenderer.send('shell:openExternal', url),
+    
     // --- General Utilities ---
-    openExternalLink: (url) => ipcRenderer.send('open-external-link', url),
-    log: (level, message) => ipcRenderer.send('log', { level, message }),
+    log: (level, message) => ipcRenderer.send('log:log', { level, message }),
 });
