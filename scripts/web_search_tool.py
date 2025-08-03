@@ -12,9 +12,6 @@ logger = setup_logger('web_search_tool')
 # SECTION 2: CORE SEARCH LOGIC
 # =============================================================================
 def perform_search(query):
-    """
-    Performs a web search using the Tavily Search API.
-    """
     api_key = os.environ.get('TAVILY_API_KEY')
     if not api_key:
         raise ValueError("TAVILY_API_KEY not found in environment variables.")
@@ -37,10 +34,7 @@ def perform_search(query):
 # SECTION 3: ADAPTER FUNCTION FOR SCRIPT ROUTER
 # =============================================================================
 def perform_web_search_adapter(payload, output_dir):
-    """
-    Adapter function to handle web search requests.
-    This function does not use AI and therefore costs 0 AI Coins.
-    """
+
     query = payload.get('query')
     if not query:
         return {"error": "No search query provided.", "coins_used": 0}

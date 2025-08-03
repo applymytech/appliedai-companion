@@ -14,7 +14,7 @@ def setup_logger(name, log_file='python_main.log'):
     and the console (stderr).
     """
     # --- Configuration ---
-    log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
+    log_dir = os.path.join(os.path.expandvars('%APPDATA%'), 'appliedai-companion', 'logs')
     os.makedirs(log_dir, exist_ok=True)
     
     logger = logging.getLogger(name)

@@ -45,11 +45,6 @@ function initializeAppUI(authUser) {
     const pageTitle = document.getElementById('pageTitle');
     const statusMessage = document.getElementById('statusMessage');
     const loadingIndicator = document.getElementById('loadingIndicator');
-    const progressModal = document.getElementById('progressModal');
-    const progressTitle = document.getElementById('progress-title');
-    const progressMessage = document.getElementById('progress-message');
-    const progressBarInner = document.getElementById('progress-bar-inner');
-    const progressPercentage = document.getElementById('progress-percentage');
     const chatMessages = document.getElementById('chatMessages'); // Moved up for global access
 
     // =========================================================================
@@ -98,34 +93,6 @@ function initializeAppUI(authUser) {
         // Ensure the status message is visible above everything
         statusMessage.style.zIndex = 1001; 
         setTimeout(() => statusMessage.classList.add('hidden'), duration);
-    }
-
-    // Renamed showProgressModal to indicate it handles the visual elements
-    function showLoadingFeedback(title, message, isModal = false) {
-        if (isModal) {
-            progressTitle.textContent = title;
-            progressMessage.textContent = message;
-            progressBarInner.style.width = '0%';
-            progressPercentage.textContent = '0%';
-            progressModal.classList.remove('hidden');
-            loadingIndicator.classList.add('hidden'); // Hide top bar if modal is shown
-        } else {
-            loadingIndicator.classList.remove('hidden'); // Show top bar
-            progressModal.classList.add('hidden'); // Ensure modal is hidden
-        }
-    }
-
-    function updateProgress(percent, message) {
-        progressBarInner.style.width = `${percent}%`;
-        progressPercentage.textContent = `${percent}%`;
-        if (message) {
-            progressMessage.textContent = message;
-        }
-    }
-
-    function hideLoadingFeedback() {
-        progressModal.classList.add('hidden');
-        loadingIndicator.classList.add('hidden');
     }
 
     // Generic function to render file lists for knowledge base or canvas
@@ -299,7 +266,6 @@ function initializeAppUI(authUser) {
             log('info', 'User clicked "Shred Output Folder Now"');
             const result = await window.electronAPI.showConfirmDialog({ type: 'warning', buttons: ['Cancel', 'Shred'], defaultId: 0, title: 'Confirm Shred', message: 'Are you sure you want to permanently delete everything in the output folder? This cannot be undone.' });
             if (result.response === 1) {
-                showLoadingFeedback('Shredding...', 'Securely deleting files...', true); // Show modal
                 window.electronAPI.runScript({ functionName: 'shred_folder_adapter', payload: { folder_path: outputPathSpan.textContent } });
             }
         });
@@ -385,8 +351,7 @@ function initializeAppUI(authUser) {
                 payload.image_path = selectedFilesStore.ai_image_input;
                 if (!payload.image_path) return showStatus('Please select an input image.', true);
             }
-            
-            showLoadingFeedback('Generating Image...', `Using ${toolTitle.textContent} tool...`, true); // Show modal
+
             window.electronAPI.runScript({ functionName: 'generate_image', payload });
         });
 
@@ -416,8 +381,6 @@ function initializeAppUI(authUser) {
                     preserve_aspect: aspect
                 }
             };
-            
-            showLoadingFeedback('Converting Images', `Converting to ${format}...`, true); // Show modal
             window.electronAPI.runScript({ functionName: 'convert_image', payload });
         });
     }
@@ -436,7 +399,6 @@ function initializeAppUI(authUser) {
         });
         mergeFilesBtn.addEventListener('click', () => {
             const mode = document.querySelector('input[name="mergeMode"]:checked').value;
-            showLoadingFeedback('Merging Files', 'Combining selected files...', true); // Show modal
             window.electronAPI.runScript({ functionName: 'merge_files', payload: { files: selectedFilesStore.merge, mode: mode } });
         });
 
@@ -452,7 +414,6 @@ function initializeAppUI(authUser) {
         shredFilesBtn.addEventListener('click', async () => {
             const result = await window.electronAPI.showConfirmDialog({type: 'warning', buttons: ['Cancel', 'Shred'], defaultId: 0, title: 'Confirm Shred', message: 'Are you sure you want to permanently shred the selected files?'});
             if (result.response === 1) {
-                showLoadingFeedback('Shredding Files', 'Securely deleting selected files...', true); // Show modal
                 window.electronAPI.runScript({ functionName: 'shred_files_adapter', payload: { files: selectedFilesStore.shred } });
             }
         });
@@ -461,7 +422,6 @@ function initializeAppUI(authUser) {
             if (result && !result.canceled && result.filePaths.length > 0) {
                 const confirmResult = await window.electronAPI.showConfirmDialog({type: 'warning', buttons: ['Cancel', 'Shred'], defaultId: 0, title: 'Confirm Shred', message: `Are you sure you want to shred the entire folder: ${result.filePaths[0]}?`});
                 if (confirmResult.response === 1) {
-                    showLoadingFeedback('Shredding Folder', 'Securely deleting folder contents...', true); // Show modal
                     window.electronAPI.runScript({ functionName: 'shred_folder_adapter', payload: { folder_path: result.filePaths[0] } });
                 }
             }
@@ -478,26 +438,22 @@ function initializeAppUI(authUser) {
         document.getElementById('scrapeSinglePageBtn').addEventListener('click', () => {
             const url = formatUrl(document.getElementById('singlePageUrlInput').value);
             if (!url) return showStatus('Please enter a URL.', true);
-            showLoadingFeedback('Scraping Page', `Scraping content from ${url}...`, true); // Show modal
             window.electronAPI.runScript({ functionName: 'scrape_single_page', payload: { url } });
         });
         document.getElementById('scrapeSitemapBtn').addEventListener('click', () => {
             const url = formatUrl(document.getElementById('sitemapUrlInput').value);
             if (!url) return showStatus('Please enter a sitemap URL.', true);
-            showLoadingFeedback('Scraping Sitemap', `Processing sitemap from ${url}...`, true); // Show modal
             window.electronAPI.runScript({ functionName: 'scrape_sitemap', payload: { sitemap_url: url } });
         });
         document.getElementById('downloadFilesBtn').addEventListener('click', () => {
             const url = formatUrl(document.getElementById('fileDownloaderUrlInput').value);
             const fileType = document.getElementById('fileTypeSelect').value;
             if (!url) return showStatus('Please enter a URL.', true);
-            showLoadingFeedback('Downloading Files', `Searching for .${fileType} files...`, true); // Show modal
             window.electronAPI.runScript({ functionName: 'download_files_from_page', payload: { url, file_type: fileType } });
         });
         document.getElementById('downloadWebsiteBtn').addEventListener('click', () => {
             const url = formatUrl(document.getElementById('downloadWebsiteUrlInput').value);
             if (!url) return showStatus('Please enter a URL.', true);
-            showLoadingFeedback('Downloading Website', 'Starting website snapshot...', true); // Show modal
             window.electronAPI.runScript({ functionName: 'download_website_adapter', payload: { url } });
         });
     }
@@ -516,7 +472,6 @@ function initializeAppUI(authUser) {
             });
             convertButton.addEventListener('click', () => { // Attach listener to the button reference
                 const format = document.getElementById(`${typeLower}OutputFormatSelect`).value;
-                showLoadingFeedback(`Converting ${type}`, `Converting to ${format}...`, true); // Show modal
                 window.electronAPI.runScript({ functionName: `convert_${typeLower}`, payload: { files: selectedFilesStore[typeLower], format: format } });
             });
         };
@@ -568,8 +523,6 @@ function initializeAppUI(authUser) {
 
             appendChatMessage('user', message); // Immediately show user's message
             log('info', 'User sent a chatbot message.');
-            
-            showLoadingFeedback('Gemma is thinking...', 'Please wait for a response.', true); // Show modal
             
             const payload = {
                 uid: currentUser.uid,
@@ -679,13 +632,11 @@ function initializeAppUI(authUser) {
         if (isProgressUpdate) {
             updateProgress(parsedData.progress.percent, parsedData.progress.message);
             if (parsedData.progress.percent >= 100) {
-                setTimeout(hideLoadingFeedback, 750); // Hide both modal and top bar
             }
             return; // Exit here for progress updates
         }
 
         // --- If we reach here, it's a final reply (or initial reply not progress) ---
-        hideLoadingFeedback(); // Hide both modal and top bar for final replies
 
         if (!success) {
             log('error', `Error from '${source}':`, error);

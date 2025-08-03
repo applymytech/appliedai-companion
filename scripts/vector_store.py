@@ -4,7 +4,7 @@
 import os
 import json
 import numpy as np
-import faiss
+from import faiss 
 from logger import setup_logger
 
 logger = setup_logger('vector_store')

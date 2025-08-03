@@ -1,5 +1,6 @@
 # Secrets and env
 .env
+.venv
 
 # Node modules
 node_modules/
